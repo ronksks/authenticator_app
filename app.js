@@ -1,80 +1,115 @@
-//jshint esversion:6
 require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
-const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require("md5");
-// const encrypt = require("mongoose-encryption");
-
+const ejs = require("ejs");
+const passport = require("passport");
+const passportLocal = require("passport-local");
+const passportLocalMongoose = require("passport-local-mongoose");
+const session = require("express-session");
 const app = express();
 
 app.use(express.static("public"));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
+// set up the express-session
+
 app.use(
-  bodyParser.urlencoded({
-    extended: true,
+  session({
+    secret: "my name is ronKSKS",
+    resave: false,
+    saveUninitialized: true,
   })
 );
+// initialize passport and combine it with session
+app.use(passport.initialize());
+app.use(passport.session());
 
-mongoose.connect("mongodb://localhost:27017/userDB", { useNewUrlParser: true });
-
-const userSchema = new mongoose.Schema({
+mongoose.connect("mongodb://localhost:27017/userDB"); //create secret Database
+//create User Schema
+const UserSchema = new mongoose.Schema({
   email: String,
   password: String,
 });
+//set up the passportLocalMongoose
+UserSchema.plugin(passportLocalMongoose);
+//configure passportLocalMongoose
+const User = new mongoose.model("User", UserSchema);
+passport.use(User.createStrategy());
 
-const User = new mongoose.model("User", userSchema);
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+//encryption
+//var secret = "hello do you even know me";
+//mongoose-encryption no more needed
+//secretSchema.plugin(encrypt, { secret: process.env.SECRET_KEY,encryptedFields: ['password']  });
+// secret collection
 
 app.get("/", (req, res) => {
-  res.render("home.ejs");
+  res.render("home");
+});
+//logout route
+app.get("/logout", function (req, res) {
+  req.logout(function (err) {
+    if (err) {
+      return err;
+    }
+    res.redirect("/");
+  });
+});
+
+app.get("/secrets", (req, res) => {
+  res.render("secrets");
+});
+app.get("/secrets", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.render("/secrets");
+  } else {
+    res.redirect("/login");
+  }
 });
 
 app.get("/login", (req, res) => {
-  res.render("login.ejs");
+  res.render("login");
 });
-
 app.get("/register", (req, res) => {
-  res.render("register.ejs");
+  res.render("register");
 });
 
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password),
-  });
-  //when we use save - it encrypts the db
-  newUser.save((err) => {
-    if (err) {
-      console.log(err);
-    } else {
-      res.render("secrets");
-    }
-  });
-});
-
-app.post("/login", (req, res) => {
-  const userName = req.body.username;
-  const password = md5(req.body.password);
-
-  //when we use find - it decrypts the db
-  User.findOne({ email: userName }, (err, foundUser) => {
-    if (err) {
-      console.log(err);
-    } else {
-      if (foundUser) {
-        if (foundUser.password === password) {
-          res.render("secrets");
-        } else {
-          console.log("incorrect password");
-        }
+  User.register(
+    { username: req.body.username },
+    req.body.password,
+    function (err, user) {
+      if (err) {
+        console.log(err);
+        res.redirect("/register");
       } else {
-        console.log("incorrect username");
+        passport.authenticate("local")(req, res, function () {
+          res.redirect("/secrets");
+        });
       }
     }
+  );
+});
+
+app.post("/login", function (req, res) {
+  const user = new User({
+    username: req.body.username,
+    password: req.body.password,
+  });
+  req.login(user, function (err) {
+    if (err) {
+      console.log(err);
+    } else {
+      passport.authenticate("local")(req, res, function () {
+        res.redirect("/secrets");
+      });
+    }
   });
 });
 
-app.listen(3000, () => {
-  console.log("Server started on port 3000");
+app.listen(3000, function (req, res) {
+  console.log("server is listening to port 3000");
 });
