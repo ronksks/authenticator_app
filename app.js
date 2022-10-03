@@ -31,12 +31,14 @@ const UserSchema = new mongoose.Schema({
   email: String,
   password: String,
 });
+
 //set up the passportLocalMongoose
 UserSchema.plugin(passportLocalMongoose);
+
 //configure passportLocalMongoose
 const User = new mongoose.model("User", UserSchema);
-passport.use(User.createStrategy());
 
+passport.use(User.createStrategy());
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
@@ -44,7 +46,7 @@ passport.deserializeUser(User.deserializeUser());
 //var secret = "hello do you even know me";
 //mongoose-encryption no more needed
 //secretSchema.plugin(encrypt, { secret: process.env.SECRET_KEY,encryptedFields: ['password']  });
-// secret collection
+// user collection
 
 app.get("/", (req, res) => {
   res.render("home");
